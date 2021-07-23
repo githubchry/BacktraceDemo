@@ -4,30 +4,35 @@
 #include <stdlib.h>
 #include <execinfo.h>   // backtrace
 #include <unistd.h>     // getpid
+#include <dlfcn.h>      // dlopen, dlerror, dlsym, dlclose
 
 
 // 注意：绝对不要出现出现编译警告 [-Wimplicit-function-declaration]
 
 /*
-gcc -Wall -o lite lite.c -g ;./lite
+gcc -Wall -o dynamic_load dynamic_load.c -L. -ladd -ldl -g;./dynamic_load
 =================>>>catch signal 11<<<=====================
-[00] ./lite(+0x12fb) [0x55bccaa652fb]
-[01] ./lite(+0x14f6) [0x55bccaa654f6]
-[02] /lib/x86_64-linux-gnu/libc.so.6(+0x46210) [0x7f385d3e7210]
-[03] ./lite(+0x1545) [0x55bccaa65545]
-[04] /lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0xf3) [0x7f385d3c80b3]
-[05] ./lite(+0x120e) [0x55bccaa6520e]
-55bccaa65000-55bccaa66000 r-xp 00001000 00:2c 36873221949326498          /mnt/d/codes/git/backtracedemo/lite
-7f385d389000-7f385d39b000 r-xp 00003000 08:10 12081                      /usr/lib/x86_64-linux-gnu/libgcc_s.so.1
-7f385d3c6000-7f385d53e000 r-xp 00025000 08:10 11971                      /usr/lib/x86_64-linux-gnu/libc-2.31.so
-7f385d5a0000-7f385d5c3000 r-xp 00001000 08:10 11854                      /usr/lib/x86_64-linux-gnu/ld-2.31.so
-7ffdca3cb000-7ffdca3cc000 r-xp 00000000 00:00 0                          [vdso]
+[00] ./dynamic_load(+0x135b) [0x55dcb09d935b]
+[01] ./dynamic_load(+0x1556) [0x55dcb09d9556]
+[02] /lib/x86_64-linux-gnu/libc.so.6(+0x46210) [0x7f348212d210]
+[03] ./libadd.so(add+0x1a) [0x7f34822e7113]
+[04] ./dynamic_load(+0x1609) [0x55dcb09d9609]
+[05] /lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0xf3) [0x7f348210e0b3]
+[06] ./dynamic_load(+0x126e) [0x55dcb09d926e]
+55dcb09d9000-55dcb09da000 r-xp 00001000 00:2c 21673573206951167          /mnt/d/codes/git/backtracedemo/dynamic_load
+7f34820c2000-7f34820d4000 r-xp 00003000 08:10 12081                      /usr/lib/x86_64-linux-gnu/libgcc_s.so.1
+7f348210c000-7f3482284000 r-xp 00025000 08:10 11971                      /usr/lib/x86_64-linux-gnu/libc-2.31.so
+7f34822da000-7f34822dc000 r-xp 00001000 08:10 12010                      /usr/lib/x86_64-linux-gnu/libdl-2.31.so
+7f34822e7000-7f34822e8000 r-xp 00001000 00:2c 19703248369976082          /mnt/d/codes/git/backtracedemo/libadd.so
+7f34822ec000-7f348230f000 r-xp 00001000 08:10 11854                      /usr/lib/x86_64-linux-gnu/ld-2.31.so
+7ffebf5c2000-7ffebf5c3000 r-xp 00000000 00:00 0                          [vdso]
 Segmentation fault
 
 
-addr2line -fe lite  +0x1545
-main
-/mnt/d/codes/git/backtracedemo/lite.c:99
+0x7f34822e7113 - 0x7f34822e7000 + 0x1000 => 0x1110
+addr2line -fe libadd.so 0x1113
+add
+/mnt/d/codes/git/backtracedemo/add.c:6
 */
 
 // 定义保存栈帧的最大深度 根据项目复杂度定
@@ -97,10 +102,32 @@ int main()
 {
     // 捕获段错误信号SIGSEGV
     signal(SIGSEGV, signal_handler);
-    
-    // 模拟段错误信号
-    int *pTmp = NULL;
-    *pTmp = 1;	//对未分配内存空间的指针进行赋值，模拟访问非法内存段错误
-    
+
+
+    // 加载动态库
+    void *handle_ = dlopen("./libadd.so", RTLD_LAZY);
+    if (!handle_)
+    {
+        printf("can't dlopen libadd.so\n");
+        return -1;
+    }
+
+    typedef int (*add_func)(int a, int b);
+
+    // 获取动态库函数符号
+    add_func add = (add_func)dlsym(handle_, "add");
+    if (!add)
+    {
+        printf("can't dlsym add\n");
+        return -2;
+    }
+
+    // 运行add();
+    int c = add(1,2);
+
+    printf("add(1,2) = [%d]\n", c);
+    // 释放
+    dlclose(handle_);
+
     return 0;
 }
