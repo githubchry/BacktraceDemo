@@ -87,6 +87,8 @@ echo "obase=16;$((0x7f34822e7113-0x7f34822e7000+0x1000))"|bc
 addr2line -fe libadd.so 1113
 add
 /mnt/d/codes/git/backtracedemo/add.c:6
+
+echo "obase=16;$((0x7f895c6afc6c-0x7f895c683000+0x35000))"|bc
 ```
 
 
@@ -254,5 +256,20 @@ main
 
 
 
-## -Wl,-Map,xxx.map
+# c++filt还原函数签名
+
+c++函数在linux系统下编译之后会变成类似下面的样子：
+
+```
+_ZN6apsara5pangu15ScopedChunkInfoINS0_12RafChunkInfoEED1Ev
+```
+
+使用c++filt得到函数的原始名称
+
+```
+c++filt _ZN6apsara5pangu15ScopedChunkInfoINS0_12RafChunkInfoEED1Ev
+Json::Value::operator[](char const*) const
+```
+
+
 
